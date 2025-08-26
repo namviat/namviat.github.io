@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My File Storage</title>
+    <style>
+        #drop_zone {
+            border: 2px dashed #bbb;
+            border-radius: 5px;
+            width: 300px;
+            height: 200px;
+            text-align: center;
+            padding: 50px 20px;
+            margin: 20px auto;
+        }
+        #fileList {
+            list-style-type: none;
+            padding: 0;
+        }
+        #fileList li {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>File Upload and Download</h1>
+    <p>To access your files from any device securely, enter your Gofile API token below (get it from <a href="https://gofile.io/myProfile" target="_blank">gofile.io/myProfile</a> after logging in). It's saved locally for seamless use on this device.</p>
+    <label for="token">Gofile API Token: </label>
+    <input type="text" id="token" placeholder="Enter your API token">
+    <button onclick="saveToken()">Save Token</button>
+    <p><strong>Note:</strong> Without a token, you can try guest uploads below, but files will be public, temporary, and not listable/deletable here—each upload gives a separate link.</p>
+
+    <div id="drop_zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
+        <p>Drag one or more files here or click to select files to upload.</p>
+        <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFiles(this.files)">
+    </div>
+    <button onclick="document.getElementById('fileInput').click()">Select Files</button>
+
+    <h2>Uploaded Files (Account Mode Only)</h2>
+    <ul id="fileList"></ul>
+
+    <script>
+        let rootFolder = null;
+
+        function getToken() {
+            return localStorage.getItem('gofileToken');
+        }
+
+        function saveToken() {
+            const token = document.getElementById('token').value;
+            if (token) {
+                localStorage.setItem('gofileToken', token);
+                alert('Token saved! Now loading your account.');
+                loadAccountDetails();
+            } else {
+                alert('Please enter a token.');
+            }
+        }
+
+        async function loadAccountDetails() {
+            const token = getToken();
+            if (!token) {
+                alert('Please save your API token first for account mode.');
+                return;
+            }
+            try {
+                const response = await fetch(`https://api.gofile.io/accounts?token=${token}`);
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    rootFolder = data.data.rootFolder;
+                    loadFiles();
+                } else {
+                    alert('Error loading account: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function loadFiles() {
+            const token = getToken();
+            if (!token || !rootFolder) return;
+            try {
+                const response = await fetch(`https://api.gofile.io/contents/${rootFolder}?token=${token}`);
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = '';
+                    const children = data.data.children || {};
+                    Object.values(children).forEach(child => {
+                        if (child.type === 'file') {
+                            const li = document.createElement('li');
+                            const link = child.directLink || child.downloadUrl;
+                            li.innerHTML = `<a href="${link}" download="${child.name}">${child.name}</a>
+                                            <button onclick="deleteFile('${child.id}')">Delete</button>`;
+                            fileList.appendChild(li);
+                        }
+                    });
+                } else {
+                    alert('Error loading files: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function deleteFile(contentId) {
+            const token = getToken();
+            if (!token) return;
+            try {
+                const response = await fetch(`https://api.gofile.io/contents/${contentId}?token=${token}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    alert('File deleted.');
+                    loadFiles();
+                } else {
+                    alert('Error deleting file: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function uploadFile(file) {
+            const token = getToken();
+            try {
+                const serverResp = await fetch('https://api.gofile.io/servers');
+                const serverData = await serverResp.json();
+                const server = serverData.data.servers[0].name;  // Pick first available server
+
+                const formData = new FormData();
+                formData.append('file', file);
+                if (token && rootFolder) {
+                    formData.append('token', token);
+                    formData.append('folderId', rootFolder);
+                } // Else guest mode, no token/folder
+
+                const uploadResp = await fetch(`https://${server}.gofile.io/uploadFile`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadData = await uploadResp.json();
+                if (uploadData.status === 'ok') {
+                    if (token) {
+                        alert('File uploaded to account: ' + file.name);
+                        loadFiles();
+                    } else {
+                        alert('Guest upload successful! Download page: ' + uploadData.data.downloadPage + '\nNote: Guest files are public and temporary.');
+                    }
+                } else {
+                    alert('Error uploading: ' + JSON.stringify(uploadData));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function dragOverHandler(ev) {
+            ev.preventDefault();
+        }
+
+        function dropHandler(ev) {
+            ev.preventDefault();
+            const files = ev.dataTransfer.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            [...files].forEach(uploadFile);
+        }
+
+        // Load on start if token exists
+        if (getToken()) {
+            loadAccountDetails();
+        }
+    </script>
+</body>
+</html>
