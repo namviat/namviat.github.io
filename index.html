@@ -43,6 +43,9 @@
 
     <div class="main p-6">
       <div id="msg" class="hidden p-4 mb-4 rounded-lg text-sm" role="status"></div>
+      <div class="p-4 mb-4 rounded-lg bg-yellow-100 text-yellow-700 text-sm">
+        ⚠️ **Note on File Listing:** File listing is not supported in this version for security reasons. Only files uploaded during this session will be visible.
+      </div>
 
       <div id="uploadBox" class="border-2 border-dashed border-blue-500 rounded-xl p-6 text-center cursor-pointer transition-all duration-150 ease-in-out bg-blue-50 hover:bg-blue-100">
         <div class="text-5xl">📁</div>
@@ -52,7 +55,6 @@
         <div class="flex items-center justify-center gap-4 mt-4">
           <input id="fileInput" type="file" multiple class="hidden">
           <button id="pickBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-full shadow transition-colors">Choose files</button>
-          <button id="syncBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-full transition-colors">Refresh List</button>
         </div>
       </div>
 
@@ -65,7 +67,7 @@
 
       <div class="mt-8">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-bold text-gray-700">Your Files <span id="count" class="text-sm font-normal text-gray-500 ml-2"></span></h2>
+          <h2 class="text-xl font-bold text-gray-700">Uploaded Files <span id="count" class="text-sm font-normal text-gray-500 ml-2"></span></h2>
           <button id="zipBtn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-full shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Download Selected as ZIP</button>
         </div>
         <div id="file-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
@@ -85,7 +87,6 @@
   const uploadBox = document.getElementById('uploadBox');
   const pickBtn = document.getElementById('pickBtn');
   const fileInput = document.getElementById('fileInput');
-  const syncBtn = document.getElementById('syncBtn');
   const zipBtn = document.getElementById('zipBtn');
   const fileGrid = document.getElementById('file-grid');
   const countEl = document.getElementById('count');
@@ -123,10 +124,9 @@
   }
 
   function iconForMime(t) {
-    if (!t) return '📄';
+    if (!t) return '�';
     if (t.startsWith('image/')) return '🖼️';
     if (t.startsWith('video/')) return '🎥';
-    if (t.startsWith('audio/')) return '🎵';
     if (t.includes('pdf')) return '📄';
     if (t.includes('zip') || t.includes('archive')) return '📦';
     if (t.startsWith('text/')) return '📃';
@@ -204,7 +204,6 @@
     e.target.value = null; // Clear input for next upload
   });
   
-  syncBtn.addEventListener('click', fetchFiles);
   zipBtn.addEventListener('click', downloadSelectedAsZip);
 
   // Cloudinary API calls
@@ -251,42 +250,6 @@
       progressContainer.classList.add('hidden');
     }, 1000);
     showMessage('All files uploaded successfully!', 'success');
-    fetchFiles();
-  }
-
-  async function fetchFiles() {
-    progressContainer.classList.remove('hidden');
-    progressFill.style.width = '25%';
-    statusText.textContent = 'Fetching files from Cloudinary...';
-    try {
-      // Direct call to Cloudinary API for fetching files
-      const url = `https://${CLOUD_NAME}.cloudinary.com/v1_1/resources/search?expression=folder:${UPLOAD_FOLDER}`;
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': 'Basic ' + btoa('484797141727837:0AhRs9vHrqghA5ZcXRyMckXlGjk')
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch file list from Cloudinary API.');
-      }
-      
-      const resources = await response.json();
-      files = resources.resources.map(file => {
-          const filename = file.public_id.split('/').pop();
-          return { ...file, filename: filename };
-      });
-      renderFiles();
-      showMessage('File list refreshed!', 'success');
-    } catch (error) {
-      showMessage(`Could not fetch file list: ${error.message}`, 'error');
-      console.error('Fetch Error:', error);
-    } finally {
-      progressFill.style.width = '100%';
-      setTimeout(() => {
-        progressContainer.classList.add('hidden');
-      }, 1000);
-    }
   }
 
   async function downloadSelectedAsZip() {
@@ -340,8 +303,10 @@
 
   // Initialize
   document.addEventListener('DOMContentLoaded', () => {
-    fetchFiles();
+    // There is no initial fetch for security reasons
+    renderFiles();
   });
 </script>
 </body>
 </html>
+�
